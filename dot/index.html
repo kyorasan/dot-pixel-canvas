@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>4x4 Pixel Diary - Zoom View</title>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+ 
+  :root { --border-color: #222; --inactive-border: #d4d4d4; --bg-color: #fffbf0; --container-bg: #ffffff; }
+  body { background-color: var(--bg-color); font-family: 'DotGothic16', sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; color: var(--border-color); padding: 20px; image-rendering: pixelated; }
+  
+  .game-container { background-color: var(--container-bg); padding: 24px; border: 3px solid var(--border-color); text-align: center; width: 300px; margin-bottom: 40px; }
+  .title-label { font-size: 20px; margin-bottom: 15px; letter-spacing: 2px; font-weight: bold; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; width: 200px; height: 200px; margin: 0 auto 20px auto; background-color: var(--border-color); border: 3px solid var(--border-color); padding: 2px; }
+  .pixel { background-color: #ffffff; cursor: pointer; }
+  
+ 
+  .picker-container { display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 20px; padding: 10px; border: 2px dashed var(--inactive-border); }
+  #currentColorDisplay { width: 40px; height: 40px; border: 3px solid var(--border-color); background-color: #ffb7b2; cursor: pointer; box-shadow: 2px 2px 0 rgba(0,0,0,0.1); }
+  .picker-label { font-size: 14px; }
+  #realColorPicker { display: none; }
+
+  .input-title { width: 180px; padding: 8px; margin-bottom: 15px; font-family: 'DotGothic16', sans-serif; font-size: 16px; text-align: center; border: 3px solid var(--border-color); background-color: #f9f9f9; outline: none; border-radius: 0; }
+  .btn { background-color: #ffb7b2; color: var(--border-color); border: 3px solid var(--border-color); padding: 12px 20px; font-family: 'DotGothic16', sans-serif; font-size: 18px; font-weight: bold; cursor: pointer; width: 100%; border-radius: 0; }
+  .btn:active { background-color: var(--border-color); color: #ffb7b2; }
+  .btn:disabled { background-color: #ccc; color: #888; cursor: not-allowed; }
+  
+ 
+  .album-section { width: 100%; max-width: 600px; }
+  .album-title { text-align: center; margin-bottom: 20px; font-size: 18px; border-bottom: 3px solid var(--border-color); padding-bottom: 10px; font-weight: bold; }
+  .album-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; }
+  
+  
+  .album-item { background: #fff; padding: 10px; border: 3px solid var(--border-color); animation: fadeIn 0.5s ease; cursor: pointer; transition: transform 0.1s; }
+  .album-item:hover { transform: scale(1.05); } 
+  
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .mini-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; width: 80px; height: 80px; background-color: var(--border-color); border: 2px solid var(--border-color); margin-bottom: 8px; padding: 1px; }
+  .mini-pixel { width: 100%; height: 100%; }
+  .item-title { font-size: 12px; text-align: center; color: var(--border-color); margin-top: 5px; font-weight: bold; }
+  .item-date { font-size: 10px; text-align: center; color: #666; }
+
+  
+  .modal {
+    display: none; 
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background-color: rgba(0,0,0,0.7); 
+    z-index: 1000;
+    justify-content: center; align-items: center;
+  }
+  .modal-content {
+    background-color: #fff; padding: 30px; border: 4px solid var(--border-color);
+    text-align: center; position: relative; width: 300px;
+    box-shadow: 10px 10px 0 rgba(0,0,0,0.5);
+    animation: popUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+  }
+  @keyframes popUp { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  .close-btn {
+    position: absolute; top: -20px; right: -20px;
+    width: 40px; height: 40px; background: #ffb7b2; border: 3px solid var(--border-color);
+    font-size: 24px; line-height: 35px; cursor: pointer; border-radius: 50%;
+  }
+
+ 
+  .big-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px;
+    width: 240px; height: 240px;
+    background-color: var(--border-color); border: 3px solid var(--border-color);
+    margin: 0 auto 20px auto; padding: 2px;
+  }
+  .modal-title { font-size: 24px; margin-bottom: 5px; font-weight: bold; }
+  .modal-date { color: #666; font-size: 14px; }
+</style>
+</head>
+<body>
+
+  <div class="game-container">
+    <div class="title-label">今日のきぶん</div>
+    <div class="grid" id="canvas"></div>
+    <div class="picker-container">
+      <div class="picker-label">いろをえらぶ →</div>
+      <div id="currentColorDisplay"></div>
+      <input type="color" id="realColorPicker" value="#ffb7b2">
+    </div>
+    <input type="text" class="input-title" id="titleInput" placeholder="タイトル(5もじ)" maxlength="5">
+    <button class="btn" id="exchangeBtn">こうかんする</button>
+  </div>
+
+  <div class="album-section">
+    <div class="album-title">みんなのアルバム</div>
+    <div class="album-grid" id="albumList"></div>
+  </div>
+
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <div class="close-btn" id="closeModal">×</div>
+      <div class="big-grid" id="modalGrid"></div>
+      <div class="modal-title" id="modalTitle"></div>
+      <div class="modal-date" id="modalDate"></div>
+    </div>
+  </div>
+
+  <script>
+    const grid = document.getElementById('canvas');
+    const colorDisplay = document.getElementById('currentColorDisplay');
+    const realPicker = document.getElementById('realColorPicker');
+    const albumList = document.getElementById('albumList');
+    
+    
+    const modal = document.getElementById('modal');
+    const closeModal = document.getElementById('closeModal');
+    const modalGrid = document.getElementById('modalGrid');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalDate = document.getElementById('modalDate');
+
+    let currentSelectedColor = "#ffb7b2";
+    window.currentPixels = new Array(16).fill("#ffffff");
+
+    const STORAGE_KEY = 'pixel_diary_album';
+
+    function savePostToStorage(postData) {
+      let saved = localStorage.getItem(STORAGE_KEY);
+      let posts = saved ? JSON.parse(saved) : [];
+      posts.unshift(postData);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(posts));
+    }
+
+    function loadAlbumFromStorage() {
+      let saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        let posts = JSON.parse(saved);
+        posts.reverse().forEach(post => {
+            window.addToAlbum(post, false);
+        });
+      }
+    }
+
+    
+    function openModal(postData) {
+      const dateObj = new Date(postData.created_at);
+      const dateString = `${(dateObj.getMonth()+1).toString().padStart(2,'0')}/${dateObj.getDate().toString().padStart(2,'0')}`;
+      let pixelData;
+      try { pixelData = JSON.parse(postData.pixels); } catch(e) { return; }
+
+     
+      modalTitle.textContent = postData.title;
+      modalDate.textContent = dateString;
+      modalGrid.innerHTML = ''; 
+
+      
+      pixelData.forEach(colorValue => {
+        const p = document.createElement('div');
+        p.style.backgroundColor = (typeof colorValue === 'string') ? colorValue : '#cccccc';
+        p.style.width = "100%"; p.style.height = "100%"; 
+        modalGrid.appendChild(p);
+      });
+
+     
+      modal.style.display = 'flex';
+    }
+
+   
+    closeModal.addEventListener('click', () => { modal.style.display = 'none'; });
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.style.display = 'none'; 
+    });
+
+    
+    colorDisplay.addEventListener('click', () => { realPicker.click(); });
+    realPicker.addEventListener('input', (e) => {
+      currentSelectedColor = e.target.value;
+      colorDisplay.style.backgroundColor = currentSelectedColor;
+    });
+
+    for (let i = 0; i < 16; i++) {
+      const pixel = document.createElement('div');
+      pixel.classList.add('pixel');
+      pixel.dataset.index = i;
+      pixel.addEventListener('click', function() {
+        const index = this.dataset.index;
+        window.currentPixels[index] = currentSelectedColor;
+        this.style.backgroundColor = currentSelectedColor;
+      });
+      grid.appendChild(pixel);
+    }
+    
+    window.addToAlbum = function(postData, shouldSave = true) {
+      if (shouldSave) { savePostToStorage(postData); }
+      
+      const dateObj = new Date(postData.created_at);
+      const dateString = `${(dateObj.getMonth()+1).toString().padStart(2,'0')}/${dateObj.getDate().toString().padStart(2,'0')}`;
+      let pixelData;
+      try { pixelData = JSON.parse(postData.pixels); } catch(e) { return; }
+
+      const itemDiv = document.createElement('div');
+      itemDiv.classList.add('album-item');
+      
+     
+      itemDiv.addEventListener('click', () => openModal(postData));
+
+      const miniGridDiv = document.createElement('div');
+      miniGridDiv.classList.add('mini-grid');
+
+      pixelData.forEach(colorValue => {
+        const p = document.createElement('div');
+        p.classList.add('mini-pixel');
+        p.style.backgroundColor = (typeof colorValue === 'string') ? colorValue : '#cccccc';
+        miniGridDiv.appendChild(p);
+      });
+
+      const itemTitle = document.createElement('div');
+      itemTitle.classList.add('item-title');
+      itemTitle.textContent = postData.title;
+      const itemDate = document.createElement('div');
+      itemDate.classList.add('item-date');
+      itemDate.textContent = dateString;
+
+      itemDiv.appendChild(miniGridDiv);
+      itemDiv.appendChild(itemTitle);
+      itemDiv.appendChild(itemDate);
+      albumList.insertBefore(itemDiv, albumList.firstChild);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadAlbumFromStorage();
+    });
+  </script>
+
+  <script>
+   
+    
+    const SUPABASE_URL = 'https://ksukltgasmhljwpykghw.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_P0MpdmhxSDHJoT6OD9IqvQ_45qje1mk';
+    
+   const exchangeBtn = document.getElementById('exchangeBtn');
+    const titleInput = document.getElementById('titleInput');
+
+    exchangeBtn.addEventListener('click', async function() {
+      exchangeBtn.disabled = true;
+      exchangeBtn.textContent = "つうしんちゅう...";
+
+      try {
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const titleText = titleInput.value || "むだい";
+        
+        const { data: resultPost, error } = await supabase
+          .rpc('exchange_art', { 
+            new_title: titleText, 
+            new_pixels: JSON.stringify(window.currentPixels) 
+          });
+
+        if (error) throw error;
+
+       
+        if (resultPost) {
+            
+            window.addToAlbum(resultPost, true);
+            alert("新しい絵があなたの元にやってきました");
+        } else {
+           
+            alert("投稿ありがとう！\n交換相手がいなかったので、あなたの絵は誰かが来るまで壺で待ってるね！");
+        }
+        
+        titleInput.value = '';
+
+      } catch (error) {
+        console.error(error);
+        alert("エラー：" + error.message);
+      } finally {
+        exchangeBtn.disabled = false;
+        exchangeBtn.textContent = "こうかんする";
+      }
+    });
+  </script>
+
+</body>
+</html>
