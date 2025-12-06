@@ -204,28 +204,33 @@ function resetCanvas() {
       const itemDiv = document.createElement('div');
       
       itemDiv.classList.add('album-item');
+      itemDiv.style.position = "relative";
 
       const delBtn = document.createElement('div');
       delBtn.textContent = "×";
-      
       
       delBtn.style.position = "absolute";
       delBtn.style.top = "-15px";   
       delBtn.style.right = "-15px"; 
       
-      
+     
       delBtn.style.width = "40px";   
       delBtn.style.height = "40px";
       delBtn.style.lineHeight = "40px";
       delBtn.style.textAlign = "center";
-      delBtn.style.color = "#999";  
+      
+      
+      delBtn.style.color = "#888";  
       delBtn.style.fontSize = "20px";
       delBtn.style.cursor = "pointer";
       delBtn.style.zIndex = "100"; 
+      
+      delBtn.style.opacity = "1";
+      delBtn.style.visibility = "visible";
      
       delBtn.addEventListener('click', (e) => {
         e.stopPropagation(); 
-        if (confirm("この絵をアルバムから削除しますか？）")) {
+        if (confirm("この絵をアルバムから削除しますか？")) {
           itemDiv.remove(); 
           removeFromStorage(postData); 
         }
