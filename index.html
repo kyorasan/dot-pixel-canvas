@@ -121,6 +121,16 @@
       posts.unshift(postData);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(posts));
     }
+    
+function resetCanvas() {
+  window.currentPixels.fill("#ffffff"); 
+
+  const pixels = document.querySelectorAll('.pixel');
+  pixels.forEach(p => p.style.backgroundColor = "#ffffff");
+
+  const titleInput = document.getElementById('titleInput');
+  if(titleInput) titleInput.value = '';
+}
 
     function loadAlbumFromStorage() {
       let saved = localStorage.getItem(STORAGE_KEY);
@@ -247,6 +257,8 @@
         } else {
             alert("投稿ありがとう！\n交換相手がいなかったので、あなたの絵は誰かが来るまで保管されます");
         }
+
+        resetCanvas();
         
         titleInput.value = '';
 
